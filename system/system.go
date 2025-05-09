@@ -5,8 +5,8 @@
 package system
 
 import (
-	"github.com/ralvescosta/gokit/logging"
 	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
 )
 
 // BasicMetricsCollector initializes and configures basic system metrics collection.
@@ -17,7 +17,7 @@ import (
 //
 // Returns:
 //   - An error if metrics collection could not be initialized.
-func BasicMetricsCollector(logger logging.Logger) error {
+func BasicMetricsCollector(logger *zap.SugaredLogger) error {
 	logger.Debug("configuring basic metrics...")
 
 	meter := otel.Meter("github.com/ralvescosta/gokit/metric/basic")
