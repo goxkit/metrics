@@ -1,4 +1,4 @@
-// Copyright (c) 2023, The GoKit Authors
+// Copyright (c) 2025, The GoKit Authors
 // MIT License
 // All rights reserved.
 
@@ -6,7 +6,7 @@ package metrics
 
 import (
 	"github.com/goxkit/configs"
-	"go.uber.org/zap"
+	"github.com/goxkit/logging"
 )
 
 type (
@@ -22,7 +22,7 @@ type (
 	// basicMetricsAttr provides common attributes needed by metrics exporters.
 	basicMetricsAttr struct {
 		// logger is used for logging metrics-related events and errors.
-		logger *zap.SugaredLogger
+		logger logging.Logger
 
 		// cfg contains application configuration values.
 		cfg *configs.Configs
