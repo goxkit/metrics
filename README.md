@@ -15,104 +15,90 @@
   </a>
 </p>
 
-The metrics package provides tools for collecting, exporting, and monitoring metrics with support for multiple exporters like OpenTelemetry Protocol (OTLP) and Prometheus.
+The metrics package provides tools for collecting, exporting, and monitoring metrics in Go applications with support for OpenTelemetry Protocol (OTLP) and more.
 
 ## Overview
 
-The `metrics` package is part of the GoKit framework and offers a comprehensive solution for application monitoring through metrics collection. It supports:
+The `metrics` package is a core component of the GoKit framework, offering a comprehensive solution for application monitoring through metrics collection. It features:
 
 - OpenTelemetry Protocol (OTLP) metrics exporter with gRPC transport
-- Prometheus metrics exporter
+- No-operation mode for development and testing
 - HTTP middleware for collecting request metrics
 - System metrics collectors for Go runtime statistics (memory, goroutines, GC, etc.)
+- Easy integration with your application configuration
 
 ## Installation
 
 ```bash
-go get github.com/ralvescosta/gokit/metrics
+go get github.com/goxkit/metrics
+```
+
+## Package Structure
+
+```
+metrics/
+├── metrics.go             # Main package entry point
+├── noop/                  # No-operation implementation
+│   └── noop.go
+├── otlp/                  # OpenTelemetry Protocol implementation
+│   └── otlp.go
+├── stdout/                # Standard output implementation
+│   └── stdout.go
+└── custom/                # Custom metrics implementations
+    ├── http/              # HTTP metrics middleware
+    │   └── http.go
+    └── system/            # System metrics collectors
+        ├── system.go
+        ├── gouges_mem.go
+        ├── gouges_sys.go
+        └── type.go
 ```
 
 ## Usage
 
-### OpenTelemetry Protocol (OTLP) Exporter
+### Basic Setup
 
-The OTLP exporter allows you to send metrics to any OpenTelemetry-compatible backend like Jaeger or a custom collector.
-
-```go
-import (
-    "context"
-    "time"
-
-    "github.com/ralvescosta/gokit/configs"
-    "github.com/ralvescosta/gokit/metrics"
-)
-
-func setupOTLPMetrics(cfgs *configs.Configs) (shutdown func(context.Context) error, err error) {
-    // Create a new OTLP builder
-    builder := metrics.NewOTLPBuilder(cfgs)
-
-    // Configure OTLP exporter
-    return builder.
-        WithAPIKeyHeader().                       // Add API key header if configured
-        Endpoint("localhost:4317").               // Set OTLP endpoint
-        WithTimeout(30 * time.Second).            // Set timeout
-        WithCompression(metrics.OtlpGzipCompressions). // Set compression
-        Provider()                                // Create the provider
-}
-```
-
-### Prometheus Exporter
-
-The Prometheus exporter allows your application to expose metrics for scraping by Prometheus.
+To initialize metrics in your application:
 
 ```go
 import (
-    "context"
-    "net/http"
-
-    "github.com/ralvescosta/gokit/configs"
-    "github.com/ralvescosta/gokit/metrics"
+    "github.com/goxkit/configs"
+    "github.com/goxkit/metrics"
 )
 
-func setupPrometheusMetrics(cfgs *configs.Configs) (http.Handler, func(context.Context) error, error) {
-    // Create a new Prometheus exporter
-    prom := metrics.NewPrometheus(cfgs)
+func main() {
+    // Create or load your application configs
+    cfgs := configs.NewConfigs()
 
-    // Get the HTTP handler for metrics endpoint
-    handler := prom.HTTPHandler()
-
-    // Configure the provider
-    shutdown, err := prom.Provider()
+    // Install metrics provider
+    provider, err := metrics.Install(cfgs)
     if err != nil {
-        return nil, nil, err
+        // Handle error
     }
 
-    return handler, shutdown, nil
-}
+    // Use the provider to create meters
+    meter := provider.Meter("my-app-metrics")
 
-// Use the handler in your HTTP server
-func exposeMetricsEndpoint(handler http.Handler) {
-    http.Handle("/metrics", handler)
-    http.ListenAndServe(":8080", nil)
+    // Create instruments and collect metrics...
 }
 ```
 
 ### HTTP Metrics Middleware
 
-The HTTP middleware collects metrics about request counts and durations.
+Collect metrics for HTTP requests in your application:
 
 ```go
 import (
     "net/http"
 
-    httpMetrics "github.com/ralvescosta/gokit/metrics/http"
+    httpMetrics "github.com/goxkit/metrics/custom/http"
 )
 
-func setupHTTPServer() {
+func setupHttpServer() {
     // Create the metrics middleware
     middleware, err := httpMetrics.NewHTTPMetricsMiddleware()
     if err != nil {
-        panic(err)
+        // Handle error
     }
 
     // Create your HTTP handler
@@ -128,44 +114,150 @@ func setupHTTPServer() {
 
 ### System Metrics Collection
 
-The system package provides collectors for Go runtime metrics like memory usage, garbage collection stats, and active goroutines.
+Collect Go runtime metrics in your application:
 
 ```go
 import (
-    "github.com/ralvescosta/gokit/logging"
-    "github.com/ralvescosta/gokit/metrics/system"
+    "github.com/goxkit/metrics/custom/system"
+    "go.uber.org/zap"
 )
 
-func setupSystemMetrics(logger logging.Logger) error {
+func setupSystemMetrics(logger *zap.SugaredLogger) error {
     // Initialize basic metrics collectors (memory and system)
     return system.BasicMetricsCollector(logger)
 }
 ```
 
-## Metrics Types
+## Core Components
 
-The package includes several metrics types based on OpenTelemetry:
+### Main Package (`metrics.go`)
 
-1. **Counters**: For values that only go up (like request counts)
-2. **Gauges**: For values that can go up and down (like memory usage)
-3. **Histograms**: For measurements like request durations with statistical analysis
+The main entry point that determines which metrics implementation to use based on configuration.
+
+```go
+provider, err := metrics.Install(configs)
+```
+
+### OTLP Implementation (`otlp/otlp.go`)
+
+Configures the OpenTelemetry Protocol exporter for sending metrics to a collector.
+
+### No-op Implementation (`noop/noop.go`)
+
+A no-operation implementation useful for development and testing.
+
+### HTTP Metrics (`custom/http/http.go`)
+
+Middleware for collecting HTTP request metrics:
+- Request counters with method, URI, and status code attributes
+- Request duration histograms
+
+### System Metrics (`custom/system/*`)
+
+Collectors for Go runtime metrics:
+- Memory usage stats (heap, GC, allocations)
+- System stats (threads, goroutines, CGO calls)
+
+## Configuration Integration
+
+The metrics package integrates with the GoKit configs package:
+
+```go
+// Enable OTLP metrics exporter
+configs.OTLPConfigs.Enabled = true
+configs.OTLPConfigs.Endpoint = "localhost:4317"
+
+// Install metrics with this configuration
+provider, err := metrics.Install(configs)
+```
 
 ## Best Practices
 
-1. **Initialization**: Initialize metrics early in your application lifecycle
-2. **Cleanup**: Use the shutdown functions returned by providers to properly cleanup resources
-3. **Context**: Pass context to metrics operations for proper propagation
-4. **Naming**: Use consistent naming conventions for your metrics
-5. **Labels/Attributes**: Keep cardinality low by limiting the number of unique values
+1. **Early Initialization**: Set up metrics early in your application lifecycle
+2. **Proper Naming**: Use consistent naming conventions for your metrics
+3. **Limited Cardinality**: Be cautious with high-cardinality labels/attributes
+4. **Context Propagation**: Pass context to your metrics operations
+5. **Integration**: Combine with tracing and logging for complete observability
 
 ## Integration with Other GoKit Packages
 
-The metrics package integrates with other GoKit packages:
-
-- Works with the `configs` package for configuration
-- Uses the `logging` package for logging metrics events
-- Can be used alongside the `tracing` package for complete observability
+The metrics package is designed to work seamlessly with other GoKit components:
+- `configs` - For configuration management
+- `tracing` - For distributed tracing
+- `logging` - For structured logging
 
 ## License
 
 MIT License - See the LICENSE file for details.
+
+## Documentation of Package Components
+
+### metrics.go
+
+The main entry point for the metrics package, responsible for installing the appropriate metrics provider based on configuration.
+
+```go
+func Install(cfgs *configs.Configs) (*sdkmetric.MeterProvider, error)
+```
+
+### noop/noop.go
+
+Provides a no-operation implementation of the metrics provider for use in development or when metrics collection is disabled.
+
+```go
+func Install(cfgs *configs.Configs) (*sdkmetric.MeterProvider, error)
+```
+
+### otlp/otlp.go
+
+Configures and installs the OpenTelemetry Protocol (OTLP) exporter for metrics collection.
+
+```go
+func Install(cfgs *configs.Configs) (*sdkmetric.MeterProvider, error)
+```
+
+### custom/http/http.go
+
+Provides HTTP middleware for collecting request metrics, including request counts and durations.
+
+```go
+type HTTPMetricsMiddleware interface {
+    Handler(next http.Handler) http.Handler
+}
+
+func NewHTTPMetricsMiddleware() (HTTPMetricsMiddleware, error)
+```
+
+### custom/system/system.go
+
+Entry point for collecting system metrics, including memory usage and Go runtime statistics.
+
+```go
+func BasicMetricsCollector(logger *zap.SugaredLogger) error
+```
+
+### custom/system/gouges_mem.go
+
+Collector for memory-related metrics from the Go runtime.
+
+```go
+func NewMemGauges(meter metric.Meter) (BasicGauges, error)
+```
+
+### custom/system/gouges_sys.go
+
+Collector for system-related metrics including threads, CGO calls, and goroutines.
+
+```go
+func NewSysGauge(meter metric.Meter) (BasicGauges, error)
+```
+
+### custom/system/type.go
+
+Defines interfaces and types for system metrics collection.
+
+```go
+type BasicGauges interface {
+    Collect(meter metric.Meter)
+}
+```

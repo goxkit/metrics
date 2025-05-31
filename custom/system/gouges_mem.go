@@ -2,6 +2,7 @@
 // MIT License
 // All rights reserved.
 
+// Package system provides detailed memory metrics collection functionality.
 package system
 
 import (
@@ -12,7 +13,9 @@ import (
 )
 
 // NewMemGauges creates a new memory metrics collector that monitors various aspects
-// of the Go runtime memory usage and garbage collection.
+// of the Go runtime memory usage and garbage collection. It initializes all the
+// necessary observable gauges for tracking memory allocation, utilization,
+// garbage collection statistics, and other related metrics.
 //
 // Parameters:
 //   - meter: The OpenTelemetry meter used to create gauge instruments.
@@ -159,41 +162,46 @@ func NewMemGauges(meter metric.Meter) (BasicGauges, error) {
 
 // Collect registers callbacks for memory metrics collection.
 // It reads memory statistics from the Go runtime and reports them through the
-// observable gauges.
+// observable gauges. The callback function will be invoked periodically by the
+// OpenTelemetry SDK to gather the latest memory statistics.
 //
 // Parameters:
 //   - meter: The OpenTelemetry meter used to register callbacks.
 func (m *memGauges) Collect(meter metric.Meter) {
-
+	// Define a callback function that will be called periodically to collect metrics
 	cb := func(_ context.Context, observer metric.Observer) error {
+		// Retrieve the current memory statistics from the Go runtime
 		var stats runtime.MemStats
 		runtime.ReadMemStats(&stats)
 
-		observer.ObserveInt64(m.ggSysBytes, int64(stats.Sys))
-		observer.ObserveInt64(m.ggAllocBytesTotal, int64(stats.TotalAlloc))
-		observer.ObserveInt64(m.ggHeapAllocBytes, int64(stats.HeapAlloc))
-		observer.ObserveInt64(m.ggFreesTotal, int64(stats.Frees))
-		observer.ObserveInt64(m.ggGcSysBytes, int64(stats.GCSys))
-		observer.ObserveInt64(m.ggHeapIdleBytes, int64(stats.HeapIdle))
-		observer.ObserveInt64(m.ggInuseBytes, int64(stats.HeapInuse))
-		observer.ObserveInt64(m.ggHeapObjects, int64(stats.HeapObjects))
-		observer.ObserveInt64(m.ggHeapReleasedBytes, int64(stats.HeapReleased))
-		observer.ObserveInt64(m.ggHeapSysBytes, int64(stats.HeapSys))
-		observer.ObserveInt64(m.ggLastGcTimeSeconds, int64(stats.LastGC))
-		observer.ObserveInt64(m.ggLookupsTotal, int64(stats.Lookups))
-		observer.ObserveInt64(m.ggMallocsTotal, int64(stats.Mallocs))
-		observer.ObserveInt64(m.ggMCacheInuseBytes, int64(stats.MCacheInuse))
-		observer.ObserveInt64(m.ggMCacheSysBytes, int64(stats.MCacheSys))
-		observer.ObserveInt64(m.ggMspanInuseBytes, int64(stats.MSpanInuse))
-		observer.ObserveInt64(m.ggMspanSysBytes, int64(stats.MSpanSys))
-		observer.ObserveInt64(m.ggNextGcBytes, int64(stats.NextGC))
-		observer.ObserveInt64(m.ggOtherSysBytes, int64(stats.OtherSys))
-		observer.ObserveInt64(m.ggStackInuseBytes, int64(stats.StackSys))
-		observer.ObserveInt64(m.ggGcCompletedCycle, int64(stats.NumGC))
-		observer.ObserveInt64(m.ggGcPauseTotal, int64(stats.PauseTotalNs))
+		// Record all memory metrics using the observer
+		observer.ObserveInt64(m.ggSysBytes, int64(stats.Sys))                   // Total memory obtained from OS
+		observer.ObserveInt64(m.ggAllocBytesTotal, int64(stats.TotalAlloc))     // Total bytes allocated (even if freed)
+		observer.ObserveInt64(m.ggHeapAllocBytes, int64(stats.HeapAlloc))       // Bytes allocated and in use
+		observer.ObserveInt64(m.ggFreesTotal, int64(stats.Frees))               // Total number of frees
+		observer.ObserveInt64(m.ggGcSysBytes, int64(stats.GCSys))               // Memory used for GC metadata
+		observer.ObserveInt64(m.ggHeapIdleBytes, int64(stats.HeapIdle))         // Heap memory waiting to be used
+		observer.ObserveInt64(m.ggInuseBytes, int64(stats.HeapInuse))           // Heap memory in use
+		observer.ObserveInt64(m.ggHeapObjects, int64(stats.HeapObjects))        // Number of allocated objects
+		observer.ObserveInt64(m.ggHeapReleasedBytes, int64(stats.HeapReleased)) // Heap memory returned to OS
+		observer.ObserveInt64(m.ggHeapSysBytes, int64(stats.HeapSys))           // Heap memory obtained from OS
+		observer.ObserveInt64(m.ggLastGcTimeSeconds, int64(stats.LastGC))       // Time of last GC
+		observer.ObserveInt64(m.ggLookupsTotal, int64(stats.Lookups))           // Number of pointer lookups
+		observer.ObserveInt64(m.ggMallocsTotal, int64(stats.Mallocs))           // Total number of mallocs
+		observer.ObserveInt64(m.ggMCacheInuseBytes, int64(stats.MCacheInuse))   // Bytes in mcache structures
+		observer.ObserveInt64(m.ggMCacheSysBytes, int64(stats.MCacheSys))       // MCacheSys bytes from system
+		observer.ObserveInt64(m.ggMspanInuseBytes, int64(stats.MSpanInuse))     // Bytes in mspan structures
+		observer.ObserveInt64(m.ggMspanSysBytes, int64(stats.MSpanSys))         // MSpanSys bytes from system
+		observer.ObserveInt64(m.ggNextGcBytes, int64(stats.NextGC))             // Target heap size of next GC
+		observer.ObserveInt64(m.ggOtherSysBytes, int64(stats.OtherSys))         // Other system allocations
+		observer.ObserveInt64(m.ggStackInuseBytes, int64(stats.StackSys))       // Stack system bytes
+		observer.ObserveInt64(m.ggGcCompletedCycle, int64(stats.NumGC))         // Number of completed GC cycles
+		observer.ObserveInt64(m.ggGcPauseTotal, int64(stats.PauseTotalNs))      // Total GC pause time in nanoseconds
 
 		return nil
 	}
 
+	// Register the callback with the meter
+	// We ignore the returned registration to avoid verbosity
 	_, _ = meter.RegisterCallback(cb)
 }

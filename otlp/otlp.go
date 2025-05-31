@@ -1,3 +1,6 @@
+// Package otlp provides an implementation of the metrics system using the OpenTelemetry Protocol.
+// It configures and sets up a metrics exporter that sends data to an OTLP-compatible collector
+// using gRPC transport.
 package otlp
 
 import (
@@ -14,9 +17,20 @@ import (
 	"go.uber.org/zap"
 )
 
+// Install creates and configures an OpenTelemetry Protocol (OTLP) metrics provider.
+// It sets up a gRPC connection to the configured OTLP endpoint, creates an exporter,
+// and initializes a MeterProvider with appropriate resource attributes.
+//
+// Parameters:
+//   - cfgs: Application configuration containing OTLP settings and where the metrics provider will be stored
+//
+// Returns:
+//   - A configured MeterProvider that exports metrics via OTLP
+//   - An error if any part of the configuration process fails
 func Install(cfgs *configs.Configs) (*sdkmetric.MeterProvider, error) {
 	ctx := context.Background()
 
+	// Create a gRPC client connection if one doesn't exist yet
 	if cfgs.OTLPExporterConn == nil {
 		conn, err := otlpgrpc.NewExporterGRPCClient(cfgs)
 		if err != nil {
@@ -26,15 +40,17 @@ func Install(cfgs *configs.Configs) (*sdkmetric.MeterProvider, error) {
 		cfgs.OTLPExporterConn = conn
 	}
 
+	// Create the OTLP metrics exporter using the gRPC connection
 	exp, err := otlpmetricgrpc.New(
 		ctx,
 		otlpmetricgrpc.WithGRPCConn(cfgs.OTLPExporterConn),
 	)
 	if err != nil {
-		cfgs.Logger.Error("failed to create OTLP trace exporter", zap.Error(err))
+		cfgs.Logger.Error("failed to create OTLP metric exporter", zap.Error(err))
 		return nil, err
 	}
 
+	// Create the meter provider with periodic collection and resource attributes
 	meterProvider := sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exp)),
 		sdkmetric.WithResource(resource.NewWithAttributes(
@@ -48,6 +64,7 @@ func Install(cfgs *configs.Configs) (*sdkmetric.MeterProvider, error) {
 		)),
 	)
 
+	// Store the provider in the configs and set as global provider
 	cfgs.MetricsProvider = meterProvider
 	otel.SetMeterProvider(meterProvider)
 

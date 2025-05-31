@@ -2,6 +2,8 @@
 // MIT License
 // All rights reserved.
 
+// Package system provides system metrics collection capabilities for monitoring
+// memory usage, garbage collection, threads, and goroutines in Go applications.
 package system
 
 import (
@@ -10,7 +12,8 @@ import (
 )
 
 // BasicMetricsCollector initializes and configures basic system metrics collection.
-// It sets up memory and system gauges and starts collecting metrics.
+// It sets up memory and system gauges and starts the continuous collection of metrics
+// to monitor runtime performance and resource usage of the application.
 //
 // Parameters:
 //   - logger: A logger instance for logging metrics-related messages.
@@ -20,15 +23,16 @@ import (
 func BasicMetricsCollector(logger *zap.SugaredLogger) error {
 	logger.Debug("configuring basic metrics...")
 
-	meter := otel.Meter("github.com/ralvescosta/gokit/metric/basic")
+	// Create a meter with an appropriate instrumentation scope name
+	meter := otel.Meter("github.com/goxkit/metrics/custom/system")
 
-	//Memory stats
+	// Initialize memory statistics collection
 	mem, err := NewMemGauges(meter)
 	if err != nil {
 		return err
 	}
 
-	//sys
+	// Initialize system statistics collection (threads, goroutines, etc.)
 	sys, err := NewSysGauge(meter)
 	if err != nil {
 		return err
@@ -36,6 +40,7 @@ func BasicMetricsCollector(logger *zap.SugaredLogger) error {
 
 	logger.Debug("basic metrics configured")
 
+	// Start collecting metrics by registering the callbacks
 	mem.Collect(meter)
 	sys.Collect(meter)
 
