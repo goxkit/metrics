@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.32.0"
 	"go.uber.org/zap"
 )
 
@@ -58,9 +58,8 @@ func Install(cfgs *configs.Configs) (*sdkmetric.MeterProvider, error) {
 			semconv.ServiceNameKey.String(cfgs.AppConfigs.Name),
 			semconv.ServiceNamespaceKey.String(cfgs.AppConfigs.Namespace),
 			attribute.String("service.environment", cfgs.AppConfigs.Environment.String()),
-			semconv.DeploymentEnvironmentKey.String(cfgs.AppConfigs.Environment.String()),
+			semconv.DeploymentEnvironmentNameKey.String(cfgs.AppConfigs.Environment.String()),
 			semconv.TelemetrySDKLanguageKey.String("go"),
-			semconv.TelemetrySDKLanguageGo.Key.Bool(true),
 		)),
 	)
 
